@@ -1,22 +1,20 @@
-# LifeDrop – Emergency Blood Donor App
+# LifeDrop – Android testing build
 
-Android app built with Kotlin, Jetpack Compose and local SQLite storage.
+LifeDrop is an Android blood donor directory prototype built with Kotlin, Jetpack Compose and on-device SQLite.
 
-## Included in this foundation
-- Donor registration: name, blood group, phone, city and availability.
-- Donor search by blood group and city.
-- Emergency blood request creation.
-- Request feed with phone dialler contact and fulfilled status.
-- Local request storage.
-- Material 3 interface.
-- GitHub Actions workflow to build a debug APK.
+## Current testing-phase behavior
+- App opens without requiring login.
+- Home screen provides public donor search by blood group and location (city, area or district).
+- Donor results show Call and WhatsApp actions.
+- Settings contains local Login / Sign up.
+- Only a signed-in local account can add/update donor details or post a blood request.
+- Blood requests can be viewed without login; signed-in users can mark them fulfilled.
+- Accounts, donors and requests are stored only in the app's local SQLite database on that phone.
 
 ## Build
-Open the repository in Android Studio with JDK 17 and Android SDK 35, sync Gradle, then run on a device or emulator.
+Use JDK 17 and Android SDK 35. GitHub Actions builds the debug APK with Gradle 8.9. Download the `LifeDrop-debug-apk` artifact from the Actions tab after a successful run.
 
-The CI workflow builds with Gradle 8.9. After a successful run, download the `LifeDrop-debug-apk` artifact from the repository's Actions tab.
+## Important testing limitations
+This is a local-only prototype. A donor entered on one phone is not visible on another phone. Creating an account on one device does not create a shared online account. Search results only include records saved on that same device. No cloud backend, GPS-based radius search, push notifications or admin moderation is configured.
 
-## Current limitations
-This initial release stores data only on the device. It does not synchronize donors across devices. GPS-based nearby ranking, push notifications, authentication, donor verification, admin moderation and secure cloud services are not implemented yet.
-
-Donor contact details are sensitive. Before a public launch, add explicit consent, access controls, privacy policy, abuse reporting and secure backend services. Blood compatibility and donor eligibility must be confirmed by qualified medical staff or a licensed blood bank. This app is not medical advice.
+Local sign-up is only a testing gate, not production-grade identity or access control. Before public release, implement a secure backend, proper authentication, donor consent and privacy controls. Blood compatibility and donor eligibility must be confirmed by qualified medical staff or a licensed blood bank; this app is not medical advice.
