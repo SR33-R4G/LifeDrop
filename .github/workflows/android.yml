@@ -16,9 +16,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+      - name: Build and rename APK
+        run: |
+          gradle --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/LifeDrop.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: LifeDrop-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: LifeDrop
+          path: app/build/outputs/apk/debug/LifeDrop.apk
