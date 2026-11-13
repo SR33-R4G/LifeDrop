@@ -20,7 +20,7 @@ object SupabaseClient {
             connection.connectTimeout=15000
             connection.readTimeout=20000
             connection.setRequestProperty("apikey",PUBLISHABLE_KEY)
-            connection.setRequestProperty("Authorization","Bearer ${token ?: PUBLISHABLE_KEY}")
+            if(token!=null) connection.setRequestProperty("Authorization","Bearer $token")
             connection.setRequestProperty("Content-Type","application/json")
             connection.setRequestProperty("Accept","application/json")
             if(prefer!=null) connection.setRequestProperty("Prefer",prefer)
