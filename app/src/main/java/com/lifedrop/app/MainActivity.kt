@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -117,32 +118,59 @@ class MainActivity:ComponentActivity(){
 
 @Composable private fun Settings(session:CloudSession?,authenticate:(String,String,String,String)->Unit,logout:()->Unit,
     saveDonor:(String,String,String,String,Boolean)->Unit,saveRequest:(String,String,Int,String,String,String,String)->Unit){
+
     var mode by remember{mutableStateOf("Login")}
+    var section by remember{mutableStateOf("Donor Profile")}
     var name by remember{mutableStateOf("")};var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
     var donorName by remember{mutableStateOf("")};var donorGroup by remember{mutableStateOf("A+")};var donorPhone by remember{mutableStateOf("")};var donorCity by remember{mutableStateOf("")};var available by remember{mutableStateOf(true)}
     var patient by remember{mutableStateOf("")};var reqGroup by remember{mutableStateOf("A+")};var units by remember{mutableStateOf("1")};var hospital by remember{mutableStateOf("")};var reqCity by remember{mutableStateOf("")};var reqPhone by remember{mutableStateOf("")};var urgency by remember{mutableStateOf("Urgent")}
-    Column(Modifier.fillMaxSize().padding(16.dp)){
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text("Settings",fontSize=25.sp,color=Ink,fontWeight=FontWeight.Bold)
         if(session==null){
-            Text("Create your own account or log in. Donor search is public.",color=Muted)
+            Text("Your account is used to manage your donor profile and blood requests. Searching remains open to everyone.",color=Muted)
             Row{FilterChip(mode=="Login",{mode="Login"},label={Text("Login")});Spacer(Modifier.width(8.dp));FilterChip(mode=="Sign up",{mode="Sign up"},label={Text("Sign up")})}
             if(mode=="Sign up")Field("Full name",name){name=it}
             Field("Email address",email){email=it}
             OutlinedTextField(password,{password=it},label={Text("Password (minimum 6 characters)")},visualTransformation=PasswordVisualTransformation(),singleLine=true,modifier=Modifier.fillMaxWidth().padding(vertical=4.dp))
             Button(onClick={authenticate(mode,name.trim(),email.trim(),password)},enabled=email.contains("@")&&password.length>=6&&(mode=="Login"||name.isNotBlank()),modifier=Modifier.fillMaxWidth()){Text(if(mode=="Login")"Login" else "Create account")}
         }else{
-            Text("Signed in as "+session.name,color=Muted)
-            Text("Donor profile",fontSize=18.sp,fontWeight=FontWeight.Bold,color=Ink)
-            Field("Full name",donorName){donorName=it};GroupPicker(donorGroup){donorGroup=it};Field("Phone number (include country code for WhatsApp)",donorPhone){donorPhone=it};Field("City / area / district",donorCity){donorCity=it}
-            Row(verticalAlignment=Alignment.CenterVertically){Text("Available to donate",Modifier.weight(1f));Switch(available,{available=it})}
-            Button(onClick={saveDonor(donorName.trim(),donorGroup,donorPhone.trim(),donorCity.trim(),available)},enabled=donorName.isNotBlank()&&donorPhone.filter{it.isDigit()}.length>=10&&donorCity.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text("Save donor profile")}
-            Divider(Modifier.padding(vertical=10.dp))
-            Text("Post blood request",fontSize=18.sp,fontWeight=FontWeight.Bold,color=Ink)
-            Field("Patient name",patient){patient=it};GroupPicker(reqGroup){reqGroup=it};Field("Units required",units){units=it.filter{c->c.isDigit()}}
-            Field("Hospital / blood bank",hospital){hospital=it};Field("City / area",reqCity){reqCity=it};Field("Contact phone",reqPhone){reqPhone=it}
-            Row{listOf("Urgent","Critical","Within 24h").forEach{FilterChip(urgency==it,{urgency=it},label={Text(it)})}}
-            Button(onClick={saveRequest(patient.trim(),reqGroup,units.toIntOrNull()?:1,hospital.trim(),reqCity.trim(),reqPhone.trim(),urgency)},enabled=patient.isNotBlank()&&hospital.isNotBlank()&&reqCity.isNotBlank()&&reqPhone.filter{it.isDigit()}.length>=10&&(units.toIntOrNull()?:0)>0,modifier=Modifier.fillMaxWidth()){Text("Publish blood request")}
-            OutlinedButton(onClick=logout,modifier=Modifier.fillMaxWidth()){Text("Log out")}
+            Card(colors=CardDefaults.cardColors(containerColor=Color.White),modifier=Modifier.fillMaxWidth()){
+                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.AccountCircle,null,tint=Red);Column(Modifier.padding(start=10.dp)){Text("Signed in",fontWeight=FontWeight.Bold,color=Ink);Text(session.name,color=Muted,fontSize=12.sp)}}
+            }
+            Text("Manage your LifeDrop activity",color=Muted)
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                listOf("Donor Profile","Blood Request","Account").forEach{tab->FilterChip(selected=section==tab,onClick={section=tab},label={Text(tab)})}
+            }
+            when(section){
+                "Donor Profile"->{
+                    Text("Donor Profile",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+                    Text("Add or update your donor details.",color=Muted,fontSize=13.sp)
+                    Field("Full name",donorName){donorName=it}
+                    Text("Blood group",fontWeight=FontWeight.SemiBold,color=Ink);GroupPicker(donorGroup){donorGroup=it}
+                    Field("Phone number (include country code for WhatsApp)",donorPhone){donorPhone=it}
+                    Field("City / area / district",donorCity){donorCity=it}
+                    Row(verticalAlignment=Alignment.CenterVertically){Text("Available to donate",Modifier.weight(1f));Switch(available,{available=it})}
+                    Button(onClick={saveDonor(donorName.trim(),donorGroup,donorPhone.trim(),donorCity.trim(),available)},enabled=donorName.isNotBlank()&&donorPhone.filter{it.isDigit()}.length>=10&&donorCity.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text("Save donor profile")}
+                }
+                "Blood Request"->{
+                    Text("Post a Blood Request",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+                    Text("Share the requirement so nearby donors can contact you.",color=Muted,fontSize=13.sp)
+                    Field("Patient name",patient){patient=it}
+                    Text("Required blood group",fontWeight=FontWeight.SemiBold,color=Ink);GroupPicker(reqGroup){reqGroup=it}
+                    Field("Units required",units){units=it.filter{c->c.isDigit()}}
+                    Field("Hospital / blood bank",hospital){hospital=it}
+                    Field("City / area",reqCity){reqCity=it}
+                    Field("Contact phone",reqPhone){reqPhone=it}
+                    Text("Urgency",fontWeight=FontWeight.SemiBold,color=Ink)
+                    Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("Urgent","Critical","Within 24h").forEach{FilterChip(urgency==it,{urgency=it},label={Text(it)})}}
+                    Button(onClick={saveRequest(patient.trim(),reqGroup,units.toIntOrNull()?:1,hospital.trim(),reqCity.trim(),reqPhone.trim(),urgency)},enabled=patient.isNotBlank()&&hospital.isNotBlank()&&reqCity.isNotBlank()&&reqPhone.filter{it.isDigit()}.length>=10&&(units.toIntOrNull()?:0)>0,modifier=Modifier.fillMaxWidth()){Text("Publish blood request")}
+                }
+                else->{
+                    Text("Account",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+                    Text("You are signed in as " + session.name + ".",color=Muted)
+                    OutlinedButton(onClick=logout,modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Logout,null);Spacer(Modifier.width(8.dp));Text("Log out")}
+                }
+            }
         }
     }
 }
