@@ -1,0 +1,66 @@
+-- LifeDrop Supabase schema
+-- Run this entire script in Supabase Dashboard -> SQL Editor -> New query.
+
+create table if not exists public.donors (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  blood_group text not null check (blood_group in ('A+','A-','B+','B-','AB+','AB-','O+','O-')),
+  phone text not null,
+  city text not null,
+  available boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.blood_requests (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  patient text not null,
+  blood_group text not null check (blood_group in ('A+','A-','B+','B-','AB+','AB-','O+','O-')),
+  units integer not null check (units > 0),
+  hospital text not null,
+  city text not null,
+  phone text not null,
+  urgency text not null default 'Urgent',
+  status text not null default 'Open' check (status in ('Open','Fulfilled')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.donors enable row level security;
+alter table public.blood_requests enable row level security;
+
+drop policy if exists "Anyone can view available donors" on public.donors;
+create policy "Anyone can view available donors" on public.donors
+for select using (available = true or auth.uid() = owner_id);
+
+drop policy if exists "Users can add their own donor profile" on public.donors;
+create policy "Users can add their own donor profile" on public.donors
+for insert to authenticated with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can update their own donor profile" on public.donors;
+create policy "Users can update their own donor profile" on public.donors
+for update to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can delete their own donor profile" on public.donors;
+create policy "Users can delete their own donor profile" on public.donors
+for delete to authenticated using (auth.uid() = owner_id);
+
+drop policy if exists "Anyone can view blood requests" on public.blood_requests;
+create policy "Anyone can view blood requests" on public.blood_requests
+for select using (true);
+
+drop policy if exists "Authenticated users can post requests" on public.blood_requests;
+create policy "Authenticated users can post requests" on public.blood_requests
+for insert to authenticated with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can update their own requests" on public.blood_requests;
+create policy "Users can update their own requests" on public.blood_requests
+for update to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can delete their own requests" on public.blood_requests;
+create policy "Users can delete their own requests" on public.blood_requests
+for delete to authenticated using (auth.uid() = owner_id);
+
+grant usage on schema public to anon, authenticated;
+grant select on public.donors, public.blood_requests to anon, authenticated;
+grant insert, update, delete on public.donors, public.blood_requests to authenticated;
