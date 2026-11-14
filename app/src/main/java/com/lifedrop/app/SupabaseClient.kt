@@ -85,8 +85,8 @@ object SupabaseClient {
         return (0 until arr.length()).map{val o=arr.getJSONObject(it);Donor(o.getString("id"),o.getString("name"),o.getString("blood_group"),o.getString("phone"),o.getString("city"))}
     }
     fun requests():List<BloodRequest> {
-        val arr=JSONArray(call("GET","/rest/v1/blood_requests?select=id,patient,blood_group,units,hospital,city,phone,urgency,status,profiles(username)&order=created_at.desc"))
-        return (0 until arr.length()).map{val o=arr.getJSONObject(it);BloodRequest(o.getString("id"),o.getString("patient"),o.getString("blood_group"),o.getInt("units"),o.getString("hospital"),o.getString("city"),o.getString("phone"),o.getString("urgency"),o.getString("status"),o.optJSONObject("profiles")?.optString("username").orEmpty())}
+        val arr=JSONArray(call("GET","/rest/v1/blood_requests?select=id,owner_id,patient,blood_group,units,hospital,city,phone,urgency,status,profiles(username)&order=created_at.desc"))
+        return (0 until arr.length()).map{val o=arr.getJSONObject(it);BloodRequest(o.getString("id"),o.getString("owner_id"),o.getString("patient"),o.getString("blood_group"),o.getInt("units"),o.getString("hospital"),o.getString("city"),o.getString("phone"),o.getString("urgency"),o.getString("status"),o.optJSONObject("profiles")?.optString("username").orEmpty())}
     }
     fun profileUsername(s:CloudSession):String {
         val arr=JSONArray(call("GET","/rest/v1/profiles?select=username&id=eq."+enc(s.userId),token=s.accessToken))
@@ -123,4 +123,4 @@ object SupabaseClient {
 }
 
 data class Donor(val id:String,val name:String,val group:String,val phone:String,val city:String)
-data class BloodRequest(val id:String,val patient:String,val group:String,val units:Int,val hospital:String,val city:String,val phone:String,val urgency:String,val status:String,val username:String)
+data class BloodRequest(val id:String,val ownerId:String,val patient:String,val group:String,val units:Int,val hospital:String,val city:String,val phone:String,val urgency:String,val status:String,val username:String)
