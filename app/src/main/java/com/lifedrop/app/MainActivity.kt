@@ -49,6 +49,7 @@ class MainActivity:ComponentActivity(){
     var busy by remember{mutableStateOf(false)}
     var notice by remember{mutableStateOf("")}
     var refresh by remember{mutableIntStateOf(0)}
+    var usernameSuggestions by remember{mutableStateOf<List<String>>(emptyList())}
 
     fun loadData(){
         scope.launch {
@@ -75,7 +76,7 @@ class MainActivity:ComponentActivity(){
                 when(page){
                     "Home"->Home(donors,group,{group=it},place,{place=it},busy)
                     "Requests"->RequestList(requests,session,{id->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.fulfill(session!!,id)};refresh++}catch(e:Exception){notice=e.message ?: "Update failed"};busy=false}})
-                    "Settings"->Settings(session,{mode,name,username,email,password->
+                    "Settings"->Settings(session,usernameSuggestions,{usernameSuggestions=emptyList()},{value->scope.launch{busy=true;try{val found=withContext(Dispatchers.IO){SupabaseClient.usernameSuggestions(value)};usernameSuggestions=found;notice=if(found.isEmpty())"Username @$value is available." else "That username is taken. Try one of these:"}catch(e:Exception){notice=e.message ?: "Could not check username"};busy=false}},{mode,name,username,email,password->
                         scope.launch {
                             busy=true;notice=""
                             try{
@@ -118,7 +119,7 @@ class MainActivity:ComponentActivity(){
     }
 }
 
-@Composable private fun Settings(session:CloudSession?,authenticate:(String,String,String,String,String)->Unit,logout:()->Unit,saveUsername:(String)->Unit,
+@Composable private fun Settings(session:CloudSession?,suggestions:List<String>,clearSuggestions:()->Unit,checkUsername:(String)->Unit,authenticate:(String,String,String,String,String)->Unit,logout:()->Unit,saveUsername:(String)->Unit,
     saveDonor:(String,String,String,String,Boolean)->Unit,saveRequest:(String,String,Int,String,String,String,String)->Unit){
 
     var mode by remember{mutableStateOf("Login")}
@@ -131,7 +132,17 @@ class MainActivity:ComponentActivity(){
         if(session==null){
             Text("Your account is used to manage your donor profile and blood requests. Searching remains open to everyone.",color=Muted)
             Row{FilterChip(mode=="Login",{mode="Login"},label={Text("Login")});Spacer(Modifier.width(8.dp));FilterChip(mode=="Sign up",{mode="Sign up"},label={Text("Sign up")})}
-            if(mode=="Sign up"){Field("Full name",name){name=it};Field("Username (unique)",username){username=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'}}}
+            if(mode=="Sign up"){
+                Field("Full name",name){name=it}
+                Field("Username (unique)",username){username=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'};clearSuggestions()}
+                OutlinedButton(onClick={checkUsername(username)},enabled=username.length>=3&&!usernameSuggestions.contains(username),modifier=Modifier.fillMaxWidth()){Text("Check username availability")}
+                if(suggestions.isNotEmpty()){
+                    Text("This username is already taken. Available suggestions:",color=Red,fontSize=13.sp,fontWeight=FontWeight.SemiBold)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        suggestions.forEach{candidate->AssistChip(onClick={username=candidate;clearSuggestions()},label={Text(candidate)})}
+                    }
+                }
+            }
             Field("Email address",email){email=it}
             OutlinedTextField(password,{password=it},label={Text("Password (minimum 6 characters)")},visualTransformation=PasswordVisualTransformation(),singleLine=true,modifier=Modifier.fillMaxWidth().padding(vertical=4.dp))
             Button(onClick={authenticate(mode,name.trim(),username.trim(),email.trim(),password)},enabled=email.contains("@")&&password.length>=6&&(mode=="Login"||(name.isNotBlank()&&username.length>=3)),modifier=Modifier.fillMaxWidth()){Text(if(mode=="Login")"Login" else "Create account")}
