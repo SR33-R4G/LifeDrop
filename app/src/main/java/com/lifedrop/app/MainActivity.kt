@@ -80,6 +80,15 @@ class MainActivity:ComponentActivity(){
                         scope.launch {
                             busy=true;notice=""
                             try{
+                                if(mode=="Sign up"){
+                                    val suggestions=withContext(Dispatchers.IO){SupabaseClient.usernameSuggestions(username)}
+                                    if(suggestions.isNotEmpty()){
+                                        usernameSuggestions=suggestions
+                                        notice="That username is already taken. Choose one of the suggestions."
+                                        busy=false
+                                        return@launch
+                                    }
+                                }
                                 val result=withContext(Dispatchers.IO){
                                     if(mode=="Sign up") SupabaseClient.signUp(name,username,email,password)
                                     else SupabaseClient.signIn(email,password)
