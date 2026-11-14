@@ -123,7 +123,7 @@ class MainActivity:ComponentActivity(){
 
     var mode by remember{mutableStateOf("Login")}
     var section by remember{mutableStateOf("Donor Profile")}
-    var name by remember{mutableStateOf("")};var username by remember{mutableStateOf("")};var accountUsername by remember{mutableStateOf(session?.username ?: "")};var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
+    var name by remember{mutableStateOf("")};var username by remember{mutableStateOf("")};var accountUsername by remember(session?.username){mutableStateOf(session?.username ?: "")};var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
     var donorName by remember{mutableStateOf("")};var donorGroup by remember{mutableStateOf("A+")};var donorPhone by remember{mutableStateOf("")};var donorCity by remember{mutableStateOf("")};var available by remember{mutableStateOf(true)}
     var patient by remember{mutableStateOf("")};var reqGroup by remember{mutableStateOf("A+")};var units by remember{mutableStateOf("1")};var hospital by remember{mutableStateOf("")};var reqCity by remember{mutableStateOf("")};var reqPhone by remember{mutableStateOf("")};var urgency by remember{mutableStateOf("Urgent")}
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
