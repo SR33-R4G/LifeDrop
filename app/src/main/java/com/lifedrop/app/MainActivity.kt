@@ -135,7 +135,7 @@ class MainActivity:ComponentActivity(){
             if(mode=="Sign up"){
                 Field("Full name",name){name=it}
                 Field("Username (unique)",username){username=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'};clearSuggestions()}
-                OutlinedButton(onClick={checkUsername(username)},enabled=username.length>=3&&!usernameSuggestions.contains(username),modifier=Modifier.fillMaxWidth()){Text("Check username availability")}
+                OutlinedButton(onClick={checkUsername(username)},enabled=username.length>=3&&suggestions.isEmpty(),modifier=Modifier.fillMaxWidth()){Text("Check username availability")}
                 if(suggestions.isNotEmpty()){
                     Text("This username is already taken. Available suggestions:",color=Red,fontSize=13.sp,fontWeight=FontWeight.SemiBold)
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
