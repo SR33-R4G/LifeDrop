@@ -27,6 +27,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val Red=Color(0xFFE53955)
 private val Ink=Color(0xFF18212F)
@@ -75,7 +79,10 @@ class MainActivity:ComponentActivity(){
                 if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 when(page){
                     "Home"->Home(donors,group,{group=it},place,{place=it},busy)
-                    "Requests"->RequestList(requests,session,{id->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.fulfill(session!!,id)};refresh++}catch(e:Exception){notice=e.message ?: "Update failed"};busy=false}})
+                    "Requests"->RequestList(requests,session,
+                        {id->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.fulfill(session!!,id)};refresh++}catch(e:Exception){notice=e.message ?: "Update failed"};busy=false}},
+                        {id,n,g,u,h,c,p,urg,remark->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.updateRequest(session!!,id,n,g,u,h,c,p,urg,remark)};notice="Request updated.";refresh++}catch(e:Exception){notice=e.message ?: "Could not update request"};busy=false}},
+                        {id->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.deleteRequest(session!!,id)};notice="Request deleted.";refresh++}catch(e:Exception){notice=e.message ?: "Could not delete request"};busy=false}})
                     "Settings"->Settings(session,usernameSuggestions,{usernameSuggestions=emptyList()},{value->scope.launch{busy=true;try{val found=withContext(Dispatchers.IO){SupabaseClient.usernameSuggestions(value)};usernameSuggestions=found;notice=if(found.isEmpty())"Username @$value is available." else "That username is taken. Try one of these:"}catch(e:Exception){notice=e.message ?: "Could not check username"};busy=false}},{mode,name,username,email,password->
                         scope.launch {
                             busy=true;notice=""
@@ -101,7 +108,7 @@ class MainActivity:ComponentActivity(){
                     },{SupabaseClient.clearSession(context);session=null;notice="Logged out."},
                     {username->scope.launch{busy=true;try{val updated=session!!.copy(username=username.trim());withContext(Dispatchers.IO){SupabaseClient.setUsername(updated,username)};session=updated;SupabaseClient.saveSession(context,updated);notice="Username saved.";refresh++}catch(e:Exception){notice=e.message ?: "Could not save username"};busy=false}},
                     {n,g,p,c,a->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.addDonor(session!!,n,g,p,c,a)};notice="Donor profile saved to cloud.";refresh++}catch(e:Exception){notice=e.message ?: "Could not save donor"};busy=false}},
-                    {n,g,u,h,c,p,urg->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.addRequest(session!!,n,g,u,h,c,p,urg)};notice="Blood request published.";refresh++}catch(e:Exception){notice=e.message ?: "Could not publish request"};busy=false}})
+                    {n,g,u,h,c,p,urg,remark->scope.launch{busy=true;try{withContext(Dispatchers.IO){SupabaseClient.addRequest(session!!,n,g,u,h,c,p,urg,remark)};notice="Blood request published.";refresh++}catch(e:Exception){notice=e.message ?: "Could not publish request"};busy=false}})
                 }
             }
         }
@@ -129,13 +136,14 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun Settings(session:CloudSession?,suggestions:List<String>,clearSuggestions:()->Unit,checkUsername:(String)->Unit,authenticate:(String,String,String,String,String)->Unit,logout:()->Unit,saveUsername:(String)->Unit,
-    saveDonor:(String,String,String,String,Boolean)->Unit,saveRequest:(String,String,Int,String,String,String,String)->Unit){
+    saveDonor:(String,String,String,String,Boolean)->Unit,saveRequest:(String,String,Int,String,String,String,String,String)->Unit){
 
     var mode by remember{mutableStateOf("Login")}
     var section by remember{mutableStateOf("Donor Profile")}
     var name by remember{mutableStateOf("")};var username by remember{mutableStateOf("")};var accountUsername by remember(session?.username){mutableStateOf(session?.username ?: "")};var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
     var donorName by remember{mutableStateOf("")};var donorGroup by remember{mutableStateOf("A+")};var donorPhone by remember{mutableStateOf("")};var donorCity by remember{mutableStateOf("")};var available by remember{mutableStateOf(true)}
     var patient by remember{mutableStateOf("")};var reqGroup by remember{mutableStateOf("A+")};var units by remember{mutableStateOf("1")};var hospital by remember{mutableStateOf("")};var reqCity by remember{mutableStateOf("")};var reqPhone by remember{mutableStateOf("")};var urgency by remember{mutableStateOf("Urgent")}
+    var requestRemark by remember{mutableStateOf("")};var showRequestRemark by remember{mutableStateOf(false)}
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text("Settings",fontSize=25.sp,color=Ink,fontWeight=FontWeight.Bold)
         if(session==null){
@@ -185,7 +193,9 @@ class MainActivity:ComponentActivity(){
                     Field("Contact phone",reqPhone){reqPhone=it}
                     Text("Urgency",fontWeight=FontWeight.SemiBold,color=Ink)
                     Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("Urgent","Critical","Within 24h").forEach{FilterChip(urgency==it,{urgency=it},label={Text(it)})}}
-                    Button(onClick={saveRequest(patient.trim(),reqGroup,units.toIntOrNull()?:1,hospital.trim(),reqCity.trim(),reqPhone.trim(),urgency)},enabled=patient.isNotBlank()&&hospital.isNotBlank()&&reqCity.isNotBlank()&&reqPhone.filter{it.isDigit()}.length>=10&&(units.toIntOrNull()?:0)>0,modifier=Modifier.fillMaxWidth()){Text("Publish blood request")}
+                    TextButton(onClick={showRequestRemark=!showRequestRemark}){Icon(Icons.Default.Notes,null);Spacer(Modifier.width(5.dp));Text(if(showRequestRemark)"Hide remarks" else "Add remarks (optional)")}
+                    if(showRequestRemark) OutlinedTextField(requestRemark,{requestRemark=it},label={Text("Additional remarks (optional)")},modifier=Modifier.fillMaxWidth(),minLines=2,maxLines=4)
+                    Button(onClick={saveRequest(patient.trim(),reqGroup,units.toIntOrNull()?:1,hospital.trim(),reqCity.trim(),reqPhone.trim(),urgency,requestRemark.trim())},enabled=patient.isNotBlank()&&hospital.isNotBlank()&&reqCity.isNotBlank()&&reqPhone.filter{it.isDigit()}.length>=10&&(units.toIntOrNull()?:0)>0,modifier=Modifier.fillMaxWidth()){Text("Publish blood request")}
                 }
                 else->{
                     Text("Account",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
@@ -200,23 +210,110 @@ class MainActivity:ComponentActivity(){
     }
 }
 
-@Composable private fun RequestList(data:List<BloodRequest>,session:CloudSession?,fulfill:(String)->Unit){
+@Composable private fun RequestList(
+    data:List<BloodRequest>,session:CloudSession?,
+    fulfill:(String)->Unit,
+    edit:(String,String,String,Int,String,String,String,String,String)->Unit,
+    delete:(String)->Unit
+){
     val ctx=LocalContext.current
     var selectedTab by remember{mutableStateOf("Open")}
+    var editing by remember{mutableStateOf<BloodRequest?>(null)}
+    var deleting by remember{mutableStateOf<BloodRequest?>(null)}
+    var editPatient by remember{mutableStateOf("")};var editGroup by remember{mutableStateOf("A+")}
+    var editUnits by remember{mutableStateOf("1")};var editHospital by remember{mutableStateOf("")}
+    var editCity by remember{mutableStateOf("")};var editPhone by remember{mutableStateOf("")}
+    var editUrgency by remember{mutableStateOf("Urgent")};var editRemark by remember{mutableStateOf("")}
+    var showEditRemark by remember{mutableStateOf(false)}
     val visibleRequests=data.filter { if(selectedTab=="Open") it.status=="Open" else it.status=="Fulfilled" }
-    Column(Modifier.fillMaxSize().padding(16.dp)){Text("Blood requests",fontSize=24.sp,color=Ink,fontWeight=FontWeight.Bold)
+    Column(Modifier.fillMaxSize().padding(16.dp)){
+        Text("Blood requests",fontSize=24.sp,color=Ink,fontWeight=FontWeight.Bold)
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(vertical=8.dp)){
             FilterChip(selected=selectedTab=="Open",onClick={selectedTab="Open"},label={Text("Open (${data.count{it.status=="Open"}})")})
             FilterChip(selected=selectedTab=="Fulfilled",onClick={selectedTab="Fulfilled"},label={Text("Fulfilled (${data.count{it.status=="Fulfilled"}})")})
         }
         if(visibleRequests.isEmpty()) Text(if(selectedTab=="Open") "No open blood requests." else "No fulfilled requests yet.",color=Muted,modifier=Modifier.padding(vertical=16.dp))
-        LazyColumn{items(visibleRequests,key={it.id}){r->Card(Modifier.fillMaxWidth().padding(vertical=5.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
-            Column(Modifier.padding(13.dp)){Row(verticalAlignment=Alignment.CenterVertically){Text(r.group,color=Red,fontSize=22.sp,fontWeight=FontWeight.Bold);Column(Modifier.weight(1f).padding(start=10.dp)){Text(r.patient,color=Ink,fontWeight=FontWeight.Bold);Text(r.city+" • "+r.urgency,color=Muted,fontSize=12.sp);Text("Posted by @"+r.username.ifBlank { "unknown" },color=Muted,fontSize=11.sp)};Text(r.status,color=Red)}
-                Text(r.units.toString()+" unit(s) • "+r.hospital)
-                Row{TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+r.phone)))}){Icon(Icons.Default.Call,null);Text("Call")};TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+r.phone.filter{it.isDigit()})))}){Icon(Icons.Default.Chat,null);Text("WhatsApp")};Spacer(Modifier.weight(1f));if(session!=null&&session.userId==r.ownerId&&r.status=="Open")TextButton(onClick={fulfill(r.id)}){Text("Mark fulfilled")}}
+        LazyColumn{items(visibleRequests,key={it.id}){r->
+            var showRemark by remember(r.id){mutableStateOf(false)}
+            Card(Modifier.fillMaxWidth().padding(vertical=5.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
+                Column(Modifier.padding(13.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Text(r.group,color=Red,fontSize=22.sp,fontWeight=FontWeight.Bold)
+                        Column(Modifier.weight(1f).padding(start=10.dp)){
+                            Text(r.patient,color=Ink,fontWeight=FontWeight.Bold)
+                            Text(r.city+" • "+r.urgency,color=Muted,fontSize=12.sp)
+                            Text("Posted by @"+r.username.ifBlank { "unknown" },color=Muted,fontSize=11.sp)
+                        }
+                        Text(r.status,color=Red)
+                    }
+                    Text(r.units.toString()+" unit(s) • "+r.hospital)
+                    Text("Created: "+formatRequestDate(r.createdAt),color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=4.dp))
+                    if(r.remark.isNotBlank()){
+                        TextButton(onClick={showRemark=!showRemark},contentPadding=PaddingValues(0.dp)){
+                            Icon(Icons.Default.Notes,null);Spacer(Modifier.width(4.dp));Text(if(showRemark)"Hide remarks" else "View remarks")
+                        }
+                        if(showRemark) Text(r.remark,color=Ink,fontSize=13.sp,modifier=Modifier.fillMaxWidth().background(Color(0xFFF6F7FB),RoundedCornerShape(8.dp)).padding(10.dp))
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+r.phone)))}){Icon(Icons.Default.Call,null);Text("Call")}
+                        TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+r.phone.filter{it.isDigit()})))}){Icon(Icons.Default.Chat,null);Text("WhatsApp")}
+                        Spacer(Modifier.weight(1f))
+                        if(session!=null&&session.userId==r.ownerId){
+                            if(r.status=="Open"){
+                                TextButton(onClick={
+                                    editPatient=r.patient;editGroup=r.group;editUnits=r.units.toString();editHospital=r.hospital
+                                    editCity=r.city;editPhone=r.phone;editUrgency=r.urgency;editRemark=r.remark
+                                    showEditRemark=r.remark.isNotBlank();editing=r
+                                }){Text("Edit")}
+                                TextButton(onClick={fulfill(r.id)}){Text("Mark fulfilled")}
+                            }else{
+                                TextButton(onClick={deleting=r}){Icon(Icons.Default.Delete,null);Text("Delete")}
+                            }
+                        }
+                    }
+                }
             }
-        }}}
+        }}
     }
+    if(editing!=null){
+        AlertDialog(
+            onDismissRequest={editing=null},
+            title={Text("Edit blood request")},
+            text={
+                Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    Field("Patient name",editPatient){editPatient=it}
+                    Text("Blood group",fontWeight=FontWeight.SemiBold);GroupPicker(editGroup){editGroup=it}
+                    Field("Units required",editUnits){editUnits=it.filter{ch->ch.isDigit()}}
+                    Field("Hospital / blood bank",editHospital){editHospital=it}
+                    Field("City / area",editCity){editCity=it}
+                    Field("Contact phone",editPhone){editPhone=it}
+                    Text("Urgency",fontWeight=FontWeight.SemiBold)
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Urgent","Critical","Within 24h").forEach{FilterChip(editUrgency==it,{editUrgency=it},label={Text(it)})}}
+                    TextButton(onClick={showEditRemark=!showEditRemark}){Icon(Icons.Default.Notes,null);Spacer(Modifier.width(4.dp));Text(if(showEditRemark)"Hide remarks" else "Add remarks (optional)")}
+                    if(showEditRemark) OutlinedTextField(editRemark,{editRemark=it},label={Text("Additional remarks (optional)")},modifier=Modifier.fillMaxWidth(),minLines=2,maxLines=4)
+                }
+            },
+            confirmButton={TextButton(onClick={
+                val item=editing!!
+                edit(item.id,editPatient.trim(),editGroup,editUnits.toIntOrNull()?:1,editHospital.trim(),editCity.trim(),editPhone.trim(),editUrgency,editRemark.trim())
+                editing=null
+            },enabled=editPatient.isNotBlank()&&editHospital.isNotBlank()&&editCity.isNotBlank()&&editPhone.filter{it.isDigit()}.length>=10&&(editUnits.toIntOrNull()?:0)>0){Text("Save changes")}},
+            dismissButton={TextButton(onClick={editing=null}){Text("Cancel")}}
+        )
+    }
+    if(deleting!=null){
+        AlertDialog(onDismissRequest={deleting=null},title={Text("Delete fulfilled request?")},
+            text={Text("This will permanently delete this request.")},
+            confirmButton={TextButton(onClick={val item=deleting!!;deleting=null;delete(item.id)}){Text("Delete",color=Red)}},
+            dismissButton={TextButton(onClick={deleting=null}){Text("Cancel")}})
+    }
+}
+
+private fun formatRequestDate(value:String):String {
+    return try {
+        Instant.parse(value).atZone(ZoneId.of("Asia/Kolkata"))
+            .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a",Locale.ENGLISH))+" IST"
+    } catch(_:Exception) { value }
 }
 
 @Composable private fun GroupPicker(selected:String,choose:(String)->Unit){groups.chunked(4).forEach{row->Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){row.forEach{FilterChip(selected==it,{choose(it)},label={Text(it)})}}}}
