@@ -7,7 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-data class CloudSession(val accessToken:String,val refreshToken:String,val userId:String,val name:String)
+data class CloudSession(val accessToken:String,val refreshToken:String,val userId:String,val name:String,val username:String="")
 
 object SupabaseClient {
     private const val BASE_URL = "https://mxpswriqgeubscaeuxyx.supabase.co"
@@ -36,17 +36,21 @@ object SupabaseClient {
         } finally { connection.disconnect() }
     }
 
-    fun signUp(name:String,email:String,password:String):CloudSession? {
+    fun signUp(name:String,username:String,email:String,password:String):CloudSession? {
         val payload=JSONObject().put("email",email).put("password",password)
-            .put("data",JSONObject().put("full_name",name))
+            .put("data",JSONObject().put("full_name",name).put("username",username))
         val result=JSONObject(call("POST","/auth/v1/signup",payload))
-        return sessionFrom(result,name)
+        val session=sessionFrom(result,name)
+        if(session!=null) setUsername(session,username)
+        return session
     }
 
     fun signIn(email:String,password:String):CloudSession {
         val result=JSONObject(call("POST","/auth/v1/token?grant_type=password",JSONObject().put("email",email).put("password",password)))
-        return sessionFrom(result,result.optJSONObject("user")?.optJSONObject("user_metadata")?.optString("full_name").orEmpty())
+        val session=sessionFrom(result,result.optJSONObject("user")?.optJSONObject("user_metadata")?.optString("full_name").orEmpty())
             ?: throw IllegalStateException("Login did not return a session. Check your email confirmation settings.")
+        val username=profileUsername(session)
+        return session.copy(username=username.ifBlank { session.username })
     }
 
     private fun sessionFrom(json:JSONObject,fallbackName:String):CloudSession? {
@@ -55,19 +59,20 @@ object SupabaseClient {
         if(access.isBlank() || access=="null") return null
         val metadata=user.optJSONObject("user_metadata")
         return CloudSession(access,json.optString("refresh_token"),user.optString("id"),
-            metadata?.optString("full_name")?.takeIf{!it.isNullOrBlank()} ?: fallbackName)
+            metadata?.optString("full_name")?.takeIf{!it.isNullOrBlank()} ?: fallbackName,
+            metadata?.optString("username")?.takeIf{!it.isNullOrBlank()} ?: "")
     }
 
     fun saveSession(context:Context,session:CloudSession) {
         context.getSharedPreferences("lifedrop_cloud",Context.MODE_PRIVATE).edit()
             .putString("access",session.accessToken).putString("refresh",session.refreshToken)
-            .putString("uid",session.userId).putString("name",session.name).apply()
+            .putString("uid",session.userId).putString("name",session.name).putString("username",session.username).apply()
     }
     fun loadSession(context:Context):CloudSession? {
         val p=context.getSharedPreferences("lifedrop_cloud",Context.MODE_PRIVATE)
         val access=p.getString("access",null) ?: return null
         val uid=p.getString("uid",null) ?: return null
-        return CloudSession(access,p.getString("refresh","") ?: "",uid,p.getString("name","") ?: "")
+        return CloudSession(access,p.getString("refresh","") ?: "",uid,p.getString("name","") ?: "",p.getString("username","") ?: "")
     }
     fun clearSession(context:Context){context.getSharedPreferences("lifedrop_cloud",Context.MODE_PRIVATE).edit().clear().apply()}
 
@@ -80,8 +85,16 @@ object SupabaseClient {
         return (0 until arr.length()).map{val o=arr.getJSONObject(it);Donor(o.getString("id"),o.getString("name"),o.getString("blood_group"),o.getString("phone"),o.getString("city"))}
     }
     fun requests():List<BloodRequest> {
-        val arr=JSONArray(call("GET","/rest/v1/blood_requests?select=*&order=created_at.desc"))
-        return (0 until arr.length()).map{val o=arr.getJSONObject(it);BloodRequest(o.getString("id"),o.getString("patient"),o.getString("blood_group"),o.getInt("units"),o.getString("hospital"),o.getString("city"),o.getString("phone"),o.getString("urgency"),o.getString("status"))}
+        val arr=JSONArray(call("GET","/rest/v1/blood_requests?select=id,patient,blood_group,units,hospital,city,phone,urgency,status,profiles(username)&order=created_at.desc"))
+        return (0 until arr.length()).map{val o=arr.getJSONObject(it);BloodRequest(o.getString("id"),o.getString("patient"),o.getString("blood_group"),o.getInt("units"),o.getString("hospital"),o.getString("city"),o.getString("phone"),o.getString("urgency"),o.getString("status"),o.optJSONObject("profiles")?.optString("username").orEmpty())}
+    }
+    fun profileUsername(s:CloudSession):String {
+        val arr=JSONArray(call("GET","/rest/v1/profiles?select=username&id=eq."+enc(s.userId),token=s.accessToken))
+        return if(arr.length()>0) arr.getJSONObject(0).optString("username") else ""
+    }
+    fun setUsername(s:CloudSession,username:String) {
+        val body=JSONObject().put("id",s.userId).put("username",username.trim())
+        call("POST","/rest/v1/profiles?on_conflict=id",body,s.accessToken,"resolution=merge-duplicates,return=minimal")
     }
     fun addDonor(s:CloudSession,n:String,g:String,p:String,c:String,a:Boolean) {
         call("POST","/rest/v1/donors",JSONObject().put("owner_id",s.userId).put("name",n).put("blood_group",g).put("phone",p).put("city",c).put("available",a),s.accessToken,"return=minimal")
@@ -96,4 +109,4 @@ object SupabaseClient {
 }
 
 data class Donor(val id:String,val name:String,val group:String,val phone:String,val city:String)
-data class BloodRequest(val id:String,val patient:String,val group:String,val units:Int,val hospital:String,val city:String,val phone:String,val urgency:String,val status:String)
+data class BloodRequest(val id:String,val patient:String,val group:String,val units:Int,val hospital:String,val city:String,val phone:String,val urgency:String,val status:String,val username:String)
