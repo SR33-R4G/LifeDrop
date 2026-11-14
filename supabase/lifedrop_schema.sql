@@ -23,8 +23,12 @@ create table if not exists public.blood_requests (
   phone text not null,
   urgency text not null default 'Urgent',
   status text not null default 'Open' check (status in ('Open','Fulfilled')),
+  remark text,
   created_at timestamptz not null default now()
 );
+
+-- Safe migration for databases where the table already exists.
+alter table public.blood_requests add column if not exists remark text;
 
 alter table public.donors enable row level security;
 alter table public.blood_requests enable row level security;
@@ -55,11 +59,13 @@ for insert to authenticated with check (auth.uid() = owner_id);
 
 drop policy if exists "Users can update their own requests" on public.blood_requests;
 create policy "Users can update their own requests" on public.blood_requests
-for update to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+for update to authenticated
+using (auth.uid() = owner_id and status = 'Open')
+with check (auth.uid() = owner_id and status in ('Open','Fulfilled'));
 
 drop policy if exists "Users can delete their own requests" on public.blood_requests;
 create policy "Users can delete their own requests" on public.blood_requests
-for delete to authenticated using (auth.uid() = owner_id);
+for delete to authenticated using (auth.uid() = owner_id and status = 'Fulfilled');
 
 grant usage on schema public to anon, authenticated;
 grant select on public.donors, public.blood_requests to anon, authenticated;
