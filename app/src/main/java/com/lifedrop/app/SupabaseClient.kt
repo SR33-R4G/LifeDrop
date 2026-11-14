@@ -96,6 +96,20 @@ object SupabaseClient {
         val body=JSONObject().put("id",s.userId).put("username",username.trim())
         call("POST","/rest/v1/profiles?on_conflict=id",body,s.accessToken,"resolution=merge-duplicates,return=minimal")
     }
+
+    fun usernameSuggestions(username:String):List<String> {
+        val base=username.trim().lowercase()
+        require(base.length>=3) { "Username must contain at least 3 characters." }
+        val candidates=(1..40).map { base + (100..999).random() }.distinct()
+        val requested=(listOf(base)+candidates).distinct()
+        val filter=requested.joinToString(",") { "\"$it\"" }
+        val arr=JSONArray(call("GET","/rest/v1/profiles?select=username&username=in.("+filter+")"))
+        val existing=(0 until arr.length()).map { arr.getJSONObject(it).optString("username").lowercase() }.toSet()
+        if(base !in existing) return emptyList()
+        val available=candidates.filter { it !in existing }.distinct().take(3)
+        if(available.size<3) throw IllegalStateException("Could not generate suggestions. Please try again.")
+        return available
+    }
     fun addDonor(s:CloudSession,n:String,g:String,p:String,c:String,a:Boolean) {
         call("POST","/rest/v1/donors",JSONObject().put("owner_id",s.userId).put("name",n).put("blood_group",g).put("phone",p).put("city",c).put("available",a),s.accessToken,"return=minimal")
     }
