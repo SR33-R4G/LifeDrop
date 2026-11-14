@@ -143,7 +143,7 @@ class MainActivity:ComponentActivity(){
             Row{FilterChip(mode=="Login",{mode="Login"},label={Text("Login")});Spacer(Modifier.width(8.dp));FilterChip(mode=="Sign up",{mode="Sign up"},label={Text("Sign up")})}
             if(mode=="Sign up"){
                 Field("Full name",name){name=it}
-                Field("Username (unique)",username){username=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'};clearSuggestions()}
+                Field("Username",username){username=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'};clearSuggestions()}
                 OutlinedButton(onClick={checkUsername(username)},enabled=username.length>=3&&suggestions.isEmpty(),modifier=Modifier.fillMaxWidth()){Text("Check username availability")}
                 if(suggestions.isNotEmpty()){
                     Text("This username is already taken. Available suggestions:",color=Red,fontSize=13.sp,fontWeight=FontWeight.SemiBold)
@@ -191,7 +191,7 @@ class MainActivity:ComponentActivity(){
                     Text("Account",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
                     Text("You are signed in as " + session.name + ".",color=Muted)
                     Text("Username",fontWeight=FontWeight.SemiBold,color=Ink)
-                    Field("Choose a unique username",accountUsername){accountUsername=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'}}
+                    Field("Username",accountUsername){accountUsername=it.lowercase().filter{ch->ch.isLetterOrDigit()||ch=='_'}}
                     Button(onClick={saveUsername(accountUsername)},enabled=accountUsername.length>=3&&accountUsername!=session.username,modifier=Modifier.fillMaxWidth()){Text("Save username")}
                     OutlinedButton(onClick=logout,modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Logout,null);Spacer(Modifier.width(8.dp));Text("Log out")}
                 }
