@@ -65,7 +65,7 @@ class MainActivity:ComponentActivity(){
     MaterialTheme(colorScheme=lightColorScheme(primary=Red,background=Color(0xFFF6F7FB))){
         Scaffold(topBar={Row(Modifier.fillMaxWidth().background(Color.White).padding(18.dp),verticalAlignment=Alignment.CenterVertically){
             Text("Life",fontSize=25.sp,fontWeight=FontWeight.Black,color=Ink);Text("Drop",fontSize=25.sp,fontWeight=FontWeight.Black,color=Red)
-            Spacer(Modifier.weight(1f));Text(if(session==null) "Guest" else "@"+session.username.ifBlank { session.name },fontSize=13.sp,color=Red,fontWeight=FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f));Text(session?.let { "@" + it.username.ifBlank { it.name } } ?: "Guest",fontSize=13.sp,color=Red,fontWeight=FontWeight.SemiBold)
         }},bottomBar={NavigationBar(containerColor=Color.White){
             listOf("Home","Requests","Settings").forEach{p->NavigationBarItem(page==p,{page=p},icon={Icon(when(p){"Home"->Icons.Default.Home;"Requests"->Icons.Default.Notifications;else->Icons.Default.Settings},null)},label={Text(p)})}
         }}){pad->
