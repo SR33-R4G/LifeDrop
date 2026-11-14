@@ -202,11 +202,18 @@ class MainActivity:ComponentActivity(){
 
 @Composable private fun RequestList(data:List<BloodRequest>,session:CloudSession?,fulfill:(String)->Unit){
     val ctx=LocalContext.current
+    var selectedTab by remember{mutableStateOf("Open")}
+    val visibleRequests=data.filter { if(selectedTab=="Open") it.status=="Open" else it.status=="Fulfilled" }
     Column(Modifier.fillMaxSize().padding(16.dp)){Text("Blood requests",fontSize=24.sp,color=Ink,fontWeight=FontWeight.Bold)
-        LazyColumn{items(data,key={it.id}){r->Card(Modifier.fillMaxWidth().padding(vertical=5.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(vertical=8.dp)){
+            FilterChip(selected=selectedTab=="Open",onClick={selectedTab="Open"},label={Text("Open (${data.count{it.status=="Open"}})")})
+            FilterChip(selected=selectedTab=="Fulfilled",onClick={selectedTab="Fulfilled"},label={Text("Fulfilled (${data.count{it.status=="Fulfilled"}})")})
+        }
+        if(visibleRequests.isEmpty()) Text(if(selectedTab=="Open") "No open blood requests." else "No fulfilled requests yet.",color=Muted,modifier=Modifier.padding(vertical=16.dp))
+        LazyColumn{items(visibleRequests,key={it.id}){r->Card(Modifier.fillMaxWidth().padding(vertical=5.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
             Column(Modifier.padding(13.dp)){Row(verticalAlignment=Alignment.CenterVertically){Text(r.group,color=Red,fontSize=22.sp,fontWeight=FontWeight.Bold);Column(Modifier.weight(1f).padding(start=10.dp)){Text(r.patient,color=Ink,fontWeight=FontWeight.Bold);Text(r.city+" • "+r.urgency,color=Muted,fontSize=12.sp);Text("Posted by @"+r.username.ifBlank { "unknown" },color=Muted,fontSize=11.sp)};Text(r.status,color=Red)}
                 Text(r.units.toString()+" unit(s) • "+r.hospital)
-                Row{TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+r.phone)))}){Icon(Icons.Default.Call,null);Text("Call")};TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+r.phone.filter{it.isDigit()})))}){Icon(Icons.Default.Chat,null);Text("WhatsApp")};Spacer(Modifier.weight(1f));if(session!=null&&r.status=="Open")TextButton(onClick={fulfill(r.id)}){Text("Fulfilled")}}
+                Row{TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+r.phone)))}){Icon(Icons.Default.Call,null);Text("Call")};TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/"+r.phone.filter{it.isDigit()})))}){Icon(Icons.Default.Chat,null);Text("WhatsApp")};Spacer(Modifier.weight(1f));if(session!=null&&session.userId==r.ownerId&&r.status=="Open")TextButton(onClick={fulfill(r.id)}){Text("Mark fulfilled")}}
             }
         }}}
     }
